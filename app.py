@@ -1,51 +1,21 @@
 """
-SmogSense FastAPI backend.
+SmogSense FastAPI + Gradio Backend for Hugging Face Spaces.
 
 Endpoints:
-  GET /forecast       -> current PM2.5 + tomorrow's predicted PM2.5
-  GET /recommendation -> Proceed / Move Indoors decision + advisory text
-
-Run locally:
-  pip install fastapi uvicorn joblib pandas xgboost requests
-  uvicorn app:app --reload
-
-Then open http://127.0.0.1:8000/docs to test it interactively.
+  GET  /forecast          -> current PM2.5 + tomorrow's predicted PM2.5
+  GET  /recommendation    -> Proceed / Move Indoors decision + advisory text
+  POST /alerts/subscribe  -> Register school email for morning smog dispatch
+  POST /alerts/dispatch   -> Evaluate threshold and trigger alert notifications
 """
 
-from fastapi import FastAPI
+import gradio as gr
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 import joblib
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
-
-app = FastAPI(title="SmogSense API")
-
-# Allow the frontend (running on Vercel or locally) to call this API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://smog-sense.vercel.app",
-        "https://smog-sense-git-main-noor803.vercel.app",
-        "http://127.0.0.1:8000",
-        "http://localhost:3000",
-        "*"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/")
-def root():
-    return {
-        "status": "online",
-        "project": "SmogSense AI City Intelligence API",
-        "docs": "/docs",
-        "endpoints": ["/forecast", "/recommendation", "/alerts/subscribe", "/alerts/dispatch"]
-    }
-
+from datetime import datetime, timedelta, timezone
 
 # Load trained models once at startup
 reg_model = joblib.load("smogsense_regression_model.pkl")
@@ -62,19 +32,33 @@ ADVISORY_TEXT = {
     "Move Indoors": "Air quality is expected to be unhealthy. Move outdoor recess and PE indoors tomorrow.",
 }
 
+# In-memory alert subscriber registry
+subscribers_db = [
+    {
+        "school_name": "Lahore Model School - Main Campus",
+        "email": "admin@lahoremodel.edu.pk",
+        "threshold": 100,
+        "subscribed_at": datetime.now(timezone.utc).isoformat(),
+    }
+]
+
+
+class SubscriberCreate(BaseModel):
+    school_name: str
+    email: str
+    threshold: Optional[int] = 100
+
 
 def get_recent_conditions():
     """
     Pull the last ~10 days of PM2.5 (from OpenAQ) and weather (from
     Open-Meteo) so we can build the same lag/trend features the model
     was trained on, using the most current available data.
-
-    NOTE: replace YOUR_OPENAQ_API_KEY with your real key before running.
     """
     OPENAQ_API_KEY = "cf98e0e95d84adce03f4bd242154623c0a3132a8ee7c4974fd43531750717f05"
     PM25_SENSOR_ID = 7466365
 
-    end_date = datetime.utcnow().date()
+    end_date = datetime.now(timezone.utc).date()
     start_date = end_date - timedelta(days=10)
 
     # Recent PM2.5
@@ -84,7 +68,7 @@ def get_recent_conditions():
         params={"date_from": str(start_date), "date_to": str(end_date), "limit": 20},
     )
     resp.raise_for_status()
-    pm25_records = resp.json()["results"]
+    pm25_records = resp.json().get("results", [])
     pm25_by_date = {
         r["period"]["datetimeFrom"]["local"][:10]: r["value"] for r in pm25_records
     }
@@ -105,21 +89,31 @@ def get_recent_conditions():
         },
     )
     weather_resp.raise_for_status()
-    weather_json = weather_resp.json()["daily"]
+    weather_json = weather_resp.json().get("daily", {})
 
     dates = sorted(pm25_by_date.keys())
-    latest_date = dates[-1]
+    if not dates:
+        # Fallback if sensor API is momentarily unavailable
+        latest_pm25 = 65.0
+        pm25_series = pd.Series([65.0]*10)
+    else:
+        pm25_series = pd.Series({d: pm25_by_date[d] for d in dates}).sort_index()
+        latest_pm25 = pm25_series.iloc[-1]
 
-    pm25_series = pd.Series({d: pm25_by_date[d] for d in dates}).sort_index()
+    lag1 = pm25_series.iloc[-1] if len(pm25_series) >= 1 else 65.0
+    lag3_avg = pm25_series.iloc[-3:].mean() if len(pm25_series) >= 3 else lag1
+    lag7_avg = pm25_series.iloc[-7:].mean() if len(pm25_series) >= 7 else lag1
+    change_1d = (pm25_series.iloc[-1] - pm25_series.iloc[-2]) if len(pm25_series) >= 2 else 0.0
+    volatility_7d = pm25_series.iloc[-7:].std() if len(pm25_series) >= 7 else 5.0
+    if pd.isna(volatility_7d):
+        volatility_7d = 5.0
 
-    latest_pm25 = pm25_series.iloc[-1]
-    lag1 = pm25_series.iloc[-1]
-    lag3_avg = pm25_series.iloc[-3:].mean()
-    lag7_avg = pm25_series.iloc[-7:].mean()
-    change_1d = pm25_series.iloc[-1] - pm25_series.iloc[-2]
-    volatility_7d = pm25_series.iloc[-7:].std()
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
 
-    tomorrow = datetime.utcnow().date() + timedelta(days=1)
+    temp_list = weather_json.get("temperature_2m_mean", [28.0])
+    hum_list = weather_json.get("relative_humidity_2m_mean", [55.0])
+    wind_list = weather_json.get("wind_speed_10m_mean", [8.0])
+    precip_list = weather_json.get("precipitation_sum", [0.0])
 
     features = pd.DataFrame([{
         "pm25": latest_pm25,
@@ -128,10 +122,10 @@ def get_recent_conditions():
         "pm25_lag7_avg": lag7_avg,
         "pm25_change_1d": change_1d,
         "pm25_volatility_7d": volatility_7d,
-        "temperature_c": weather_json["temperature_2m_mean"][-1],
-        "humidity_pct": weather_json["relative_humidity_2m_mean"][-1],
-        "wind_speed_kmh": weather_json["wind_speed_10m_mean"][-1],
-        "precipitation_mm": weather_json["precipitation_sum"][-1],
+        "temperature_c": temp_list[-1] if temp_list else 28.0,
+        "humidity_pct": hum_list[-1] if hum_list else 55.0,
+        "wind_speed_kmh": wind_list[-1] if wind_list else 8.0,
+        "precipitation_mm": precip_list[-1] if precip_list else 0.0,
         "month": tomorrow.month,
         "day_of_year": tomorrow.timetuple().tm_yday,
         "is_smog_season": 1 if tomorrow.month in [11, 12, 1, 2] else 0,
@@ -140,27 +134,6 @@ def get_recent_conditions():
     return latest_pm25, features
 
 
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
-
-# In-memory alert subscriber registry (can be persisted to SQLite/PostgreSQL for production)
-subscribers_db = [
-    {
-        "school_name": "Lahore Model School - Main Campus",
-        "email": "admin@lahoremodel.edu.pk",
-        "threshold": 100,
-        "subscribed_at": datetime.utcnow().isoformat(),
-    }
-]
-
-
-class SubscriberCreate(BaseModel):
-    school_name: str
-    email: str
-    threshold: Optional[int] = 100
-
-
-@app.get("/forecast")
 def get_forecast():
     latest_pm25, features = get_recent_conditions()
     predicted_pm25 = float(reg_model.predict(features)[0])
@@ -170,7 +143,6 @@ def get_forecast():
     }
 
 
-@app.get("/recommendation")
 def get_recommendation():
     latest_pm25, features = get_recent_conditions()
     decision_code = int(clf_model.predict(features)[0])
@@ -181,43 +153,7 @@ def get_recommendation():
     }
 
 
-@app.post("/alerts/subscribe")
-def subscribe_alert(sub: SubscriberCreate):
-    """
-    Registers an administrator/school email to receive morning 6:00 AM
-    'Move Indoors' Smog Alert dispatches.
-    """
-    entry = {
-        "school_name": sub.school_name,
-        "email": sub.email,
-        "threshold": sub.threshold or 100,
-        "subscribed_at": datetime.utcnow().isoformat(),
-    }
-    subscribers_db.append(entry)
-    return {
-        "status": "success",
-        "message": f"Alert subscription registered for {sub.school_name} ({sub.email}).",
-        "subscriber_count": len(subscribers_db),
-    }
-
-
-@app.get("/alerts/subscribers")
-def list_subscribers():
-    """Returns active subscribers (for admin dashboard)."""
-    return {
-        "total_active": len(subscribers_db),
-        "subscribers": subscribers_db,
-    }
-
-
-@app.post("/alerts/dispatch")
-@app.get("/alerts/dispatch")
 def check_and_dispatch_alerts(force_test: bool = False):
-    """
-    Evaluates tomorrow's PM2.5 forecast against the 100 µg/m³ threshold.
-    If threshold is breached (or force_test=True), dispatches emergency
-    morning notifications to registered schools.
-    """
     latest_pm25, features = get_recent_conditions()
     predicted_pm25 = float(reg_model.predict(features)[0])
     decision_code = int(clf_model.predict(features)[0])
@@ -233,7 +169,7 @@ def check_and_dispatch_alerts(force_test: bool = False):
                 "school": sub["school_name"],
                 "subject": f"🚨 [SMOG ALERT - LAHORE]: Move Recess & PE Indoors Tomorrow ({round(predicted_pm25, 1)} µg/m³)",
                 "status": "SENT",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             })
 
     return {
@@ -247,12 +183,12 @@ def check_and_dispatch_alerts(force_test: bool = False):
     }
 
 
-# Gradio Space Interface (Enables Free Hugging Face Spaces Hosting while serving all FastAPI routes)
-import gradio as gr
-
+# ==========================================
+# Gradio Interface for Hugging Face Spaces
+# ==========================================
 with gr.Blocks(title="SmogSense API") as demo:
     gr.Markdown("# 🌫️ SmogSense — City Intelligence FastAPI Backend")
-    gr.Markdown("This Hugging Face Space powers the live **XGBoost PM2.5 forecasting model** and automated school alert system for Central Lahore.")
+    gr.Markdown("This Hugging Face Space powers the real-time **XGBoost PM2.5 forecasting model** and automated school alert system for Central Lahore.")
     
     with gr.Row():
         btn_forecast = gr.Button("⚡ Test /forecast API", variant="primary")
@@ -263,11 +199,61 @@ with gr.Blocks(title="SmogSense API") as demo:
     btn_forecast.click(fn=get_forecast, outputs=out_json)
     btn_rec.click(fn=get_recommendation, outputs=out_json)
 
-# Mount Gradio onto the FastAPI app
-app = gr.mount_gradio_app(app, demo, path="/")
+
+# ==========================================
+# Attach FastAPI Endpoints & CORS to demo.app
+# ==========================================
+demo.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@demo.app.get("/forecast")
+def api_forecast():
+    return get_forecast()
+
+
+@demo.app.get("/recommendation")
+def api_recommendation():
+    return get_recommendation()
+
+
+@demo.app.post("/alerts/subscribe")
+def api_subscribe(sub: SubscriberCreate):
+    entry = {
+        "school_name": sub.school_name,
+        "email": sub.email,
+        "threshold": sub.threshold or 100,
+        "subscribed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    subscribers_db.append(entry)
+    return {
+        "status": "success",
+        "message": f"Alert subscription registered for {sub.school_name} ({sub.email}).",
+        "subscriber_count": len(subscribers_db),
+    }
+
+
+@demo.app.get("/alerts/subscribers")
+def api_subscribers():
+    return {
+        "total_active": len(subscribers_db),
+        "subscribers": subscribers_db,
+    }
+
+
+@demo.app.post("/alerts/dispatch")
+@demo.app.get("/alerts/dispatch")
+def api_dispatch(force_test: bool = False):
+    return check_and_dispatch_alerts(force_test=force_test)
+
+
+# Export app for ASGI runners
+app = demo.app
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
-
-
-
+    demo.launch()
