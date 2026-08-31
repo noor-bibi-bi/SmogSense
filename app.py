@@ -263,11 +263,11 @@ with gr.Blocks(title="SmogSense API") as demo:
     btn_forecast.click(fn=get_forecast, outputs=out_json)
     btn_rec.click(fn=get_recommendation, outputs=out_json)
 
-# Mount Gradio onto the existing FastAPI app
+# Mount Gradio onto the FastAPI app
 app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860)
+
 
 
