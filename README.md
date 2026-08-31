@@ -3,21 +3,32 @@
 > **AI-Powered Air Quality Forecasting & Morning School Activity Alert System**  
 > *Built for the Smart City Hackathon — "City Intelligence" Theme*
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-smog--sense.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://smog-sense.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-noor--bibi--bi%2FSmogSense-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/noor-bibi-bi/SmogSense)
+
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![XGBoost](https://img.shields.io/badge/XGBoost-Ensemble-EB5424?style=flat)](https://xgboost.ai)
+[![XGBoost](https://img.shields.io/badge/XGBoost-Dual%20Ensemble-EB5424?style=flat)](https://xgboost.ai)
 [![OpenAQ](https://img.shields.io/badge/Data-OpenAQ%20API%20v3-0284c7?style=flat)](https://openaq.org)
 [![Open-Meteo](https://img.shields.io/badge/Weather-Open--Meteo-38bdf8?style=flat)](https://open-meteo.com)
 [![Theme](https://img.shields.io/badge/Smart%20City-City%20Intelligence-10b981?style=flat)](#)
 
 ---
 
+## 🌐 Live Application & Demo Links
+
+- 🚀 **Live Web App (Vercel)**: **[https://smog-sense.vercel.app/](https://smog-sense.vercel.app/)**
+- 💻 **GitHub Repository**: **[https://github.com/noor-bibi-bi/SmogSense](https://github.com/noor-bibi-bi/SmogSense)**
+- 📊 **Target Location**: Central Lahore Monitoring Station (OpenAQ Sensor ID: `7466365` | Lat: `31.548° N`, Lon: `74.344° E`)
+
+---
+
 ## 📌 Executive Summary
 
-Every winter, Lahore experiences catastrophic levels of hazardous particulate smog ($PM_{2.5} > 200\text{--}400\ \mu\text{g/m}^3$). While existing tools display raw historical air quality indices, **school administrators and parents face an actionable daily dilemma at 6:00 AM: *Should outdoor morning recess, physical education (PE), and sports proceed outside or move indoors?***
+Every winter, Lahore experiences catastrophic levels of hazardous particulate smog ($PM_{2.5} > 200\text{--}400\ \mu\text{g/m}^3$). While conventional apps only report retrospective air quality indices, **school administrators, sports coaches, and parents face an actionable daily dilemma at 6:00 AM: *Should outdoor morning recess, physical education (PE), and sports proceed outside or move indoors?***
 
-**SmogSense** transforms raw multi-source atmospheric data into an **actionable, predictive City Intelligence decision system**:
-1. **Next-Day $PM_{2.5}$ Forecast**: Predicts central Lahore's next-day particulate levels using a trained XGBoost ensemble combining historical sensor lags with weather forecasts.
-2. **Binary Recess Directive**: Issues an unequivocal **`Proceed`** ($\le 100\ \mu\text{g/m}^3$) or **`Move Indoors`** ($> 100\ \mu\text{g/m}^3$) recommendation with high lead time.
+**SmogSense** transforms raw multi-source atmospheric telemetry into an **actionable, predictive City Intelligence early-warning platform**:
+1. **Next-Day $PM_{2.5}$ Forecast**: Predicts central Lahore's next-day particulate levels using a trained XGBoost ensemble combining historical sensor lags with meteorological forecasts.
+2. **Binary Recess Directive**: Issues an unequivocal **`Proceed Outdoors`** ($\le 100\ \mu\text{g/m}^3$) or **`Move Indoors`** ($> 100\ \mu\text{g/m}^3$) recommendation with high lead time.
 3. **Automated Alerting Layer**: Dispatches emergency morning notifications to subscribed schools and parents before morning buses depart.
 
 ---
@@ -38,8 +49,8 @@ Every winter, Lahore experiences catastrophic levels of hazardous particulate sm
                                                                                 │
                                                                                 ▼
 ┌────────────────────────┐        ┌────────────────────────┐        ┌────────────────────────┐
-│ Institutional Alerting │ ◄───── │ FastAPI Microservice   │ ◄───── │ Single-Page Web App    │
-│ (Web Push & Emails)    │        │ (/forecast, /alerts)   │        │ (Dark Civic Dashboard) │
+│ Institutional Alerting │ ◄───── │ FastAPI Microservice   │ ◄───── │ Civic Web Dashboard    │
+│ (Web Push & Emails)    │        │ (/forecast, /alerts)   │        │ (Live on Vercel)       │
 └────────────────────────┘        └────────────────────────┘        └────────────────────────┘
 ```
 
@@ -59,7 +70,7 @@ Exploratory data analysis of Lahore's atmosphere revealed that during winter, in
 
 ## ⚡ API Contract Reference
 
-The FastAPI backend exposes the following clean endpoints:
+The FastAPI backend microservice exposes the following endpoints:
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -71,42 +82,8 @@ The FastAPI backend exposes the following clean endpoints:
 
 ---
 
-## 💻 Quick Start & Local Run
+## 👥 Hackathon Submission & Team
 
-### Prerequisites
-- Python 3.10+
-- Modern Web Browser
-
-### 1. Clone & Install Dependencies
-```bash
-git clone https://github.com/<your-username>/SmogSense.git
-cd SmogSense
-pip install -r requirements.txt
-```
-
-### 2. Launch the FastAPI Backend
-```bash
-uvicorn app:app --reload --port 8000
-```
-*API interactive documentation will be live at: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)*
-
-### 3. Open the Frontend
-Simply open `index.html` in your browser (or use VS Code Live Server / Python HTTP server):
-```bash
-python -m http.server 3000
-```
-Navigate to `http://localhost:3000`.
-
----
-
-## 🌐 Production Deployment
-
-- **Backend**: Ready for 1-click deployment on [Render](https://render.com) (`render.yaml`) or Hugging Face Spaces.
-- **Frontend**: Deploy `index.html` to [Vercel](https://vercel.com), [Netlify](https://netlify.com), or GitHub Pages. Update `API_BASE` in `index.html` to point to your live backend domain.
-
----
-
-## 👥 Hackathon Team & Acknowledgements
-
-- **Theme**: City Intelligence — Smart City Hackathon
+- **Hackathon Track**: Smart City Hackathon — *City Intelligence* Theme
+- **Live Deployment**: Hosted on Vercel at [smog-sense.vercel.app](https://smog-sense.vercel.app/)
 - **Data Providers**: OpenAQ Community Sensor Network & Open-Meteo Historical Weather API.
