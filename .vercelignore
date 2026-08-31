@@ -1,0 +1,8 @@
+# Ignore backend Python files and ML models so Vercel only deploys the static frontend
+*.py
+requirements.txt
+*.pkl
+*.csv
+Procfile
+render.yaml
+__pycache__/
