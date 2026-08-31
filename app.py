@@ -246,3 +246,28 @@ def check_and_dispatch_alerts(force_test: bool = False):
         "note": "Dispatched via SmogSense City Intelligence Automated Alerting Pipeline.",
     }
 
+
+# Gradio Space Interface (Enables Free Hugging Face Spaces Hosting while serving all FastAPI routes)
+import gradio as gr
+
+with gr.Blocks(title="SmogSense API") as demo:
+    gr.Markdown("# 🌫️ SmogSense — City Intelligence FastAPI Backend")
+    gr.Markdown("This Hugging Face Space powers the live **XGBoost PM2.5 forecasting model** and automated school alert system for Central Lahore.")
+    
+    with gr.Row():
+        btn_forecast = gr.Button("⚡ Test /forecast API", variant="primary")
+        btn_rec = gr.Button("🏫 Test /recommendation API")
+        
+    out_json = gr.JSON(label="Live Model Response")
+    
+    btn_forecast.click(fn=get_forecast, outputs=out_json)
+    btn_rec.click(fn=get_recommendation, outputs=out_json)
+
+# Mount Gradio onto the existing FastAPI app
+app = gr.mount_gradio_app(app, demo, path="/")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
+
+
