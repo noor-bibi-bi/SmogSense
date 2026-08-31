@@ -21,13 +21,31 @@ from datetime import datetime, timedelta
 
 app = FastAPI(title="SmogSense API")
 
-# Allow the frontend (running on a different port/domain) to call this API
+# Allow the frontend (running on Vercel or locally) to call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your actual frontend URL before final submission
+    allow_origins=[
+        "https://smog-sense.vercel.app",
+        "https://smog-sense-git-main-noor803.vercel.app",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "*"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "project": "SmogSense AI City Intelligence API",
+        "docs": "/docs",
+        "endpoints": ["/forecast", "/recommendation", "/alerts/subscribe", "/alerts/dispatch"]
+    }
+
 
 # Load trained models once at startup
 reg_model = joblib.load("smogsense_regression_model.pkl")
