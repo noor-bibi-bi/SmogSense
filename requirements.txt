@@ -7,4 +7,3 @@ scikit-learn>=1.4.0
 xgboost>=2.0.0
 requests>=2.31.0
 pydantic>=2.6.0
-gradio==4.44.1
