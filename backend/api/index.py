@@ -229,6 +229,8 @@ def get_recent_conditions():
 # ==========================================
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/health")
 def root():
     return {
         "name": "SmogSense City Intelligence API",
@@ -245,6 +247,7 @@ def root():
 
 
 @app.get("/forecast")
+@app.get("/api/forecast")
 def api_forecast():
     latest_pm25, feat_vec = get_recent_conditions()
     pred_val = predict_regression(feat_vec)
@@ -255,6 +258,7 @@ def api_forecast():
 
 
 @app.get("/recommendation")
+@app.get("/api/recommendation")
 def api_recommendation():
     _, feat_vec = get_recent_conditions()
     decision_code = predict_classification(feat_vec)
@@ -266,6 +270,7 @@ def api_recommendation():
 
 
 @app.post("/alerts/subscribe")
+@app.post("/api/alerts/subscribe")
 def api_subscribe(sub: SubscriberCreate):
     entry = {
         "school_name": sub.school_name,
@@ -282,6 +287,7 @@ def api_subscribe(sub: SubscriberCreate):
 
 
 @app.get("/alerts/subscribers")
+@app.get("/api/alerts/subscribers")
 def api_subscribers():
     return {
         "total_active": len(subscribers_db),
@@ -291,6 +297,8 @@ def api_subscribers():
 
 @app.post("/alerts/dispatch")
 @app.get("/alerts/dispatch")
+@app.post("/api/alerts/dispatch")
+@app.get("/api/alerts/dispatch")
 def api_dispatch(force_test: bool = False):
     latest_pm25, feat_vec = get_recent_conditions()
     predicted_pm25 = predict_regression(feat_vec)
