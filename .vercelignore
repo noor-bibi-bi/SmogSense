@@ -1,6 +1,10 @@
-# SmogSense Vercel Ignore Rules
-# Ignore legacy HF Spaces app.py and training scripts so Vercel only compiles api/
-app.py
+# Root .vercelignore for pure static Frontend deployment
+backend/
+api/
+*.py
+requirements.txt
+*.pkl
+*.json
 *.csv
 pull_*.py
 train_*.py
