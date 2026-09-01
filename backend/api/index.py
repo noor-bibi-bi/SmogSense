@@ -231,6 +231,8 @@ def get_recent_conditions():
 @app.get("/")
 @app.get("/api")
 @app.get("/api/health")
+@app.get("/api/index")
+@app.get("/api/index.py")
 def root():
     return {
         "name": "SmogSense City Intelligence API",
@@ -248,6 +250,8 @@ def root():
 
 @app.get("/forecast")
 @app.get("/api/forecast")
+@app.get("/api/index/forecast")
+@app.get("/api/index.py/forecast")
 def api_forecast():
     latest_pm25, feat_vec = get_recent_conditions()
     pred_val = predict_regression(feat_vec)
@@ -259,6 +263,8 @@ def api_forecast():
 
 @app.get("/recommendation")
 @app.get("/api/recommendation")
+@app.get("/api/index/recommendation")
+@app.get("/api/index.py/recommendation")
 def api_recommendation():
     _, feat_vec = get_recent_conditions()
     decision_code = predict_classification(feat_vec)
@@ -271,6 +277,8 @@ def api_recommendation():
 
 @app.post("/alerts/subscribe")
 @app.post("/api/alerts/subscribe")
+@app.post("/api/index/alerts/subscribe")
+@app.post("/api/index.py/alerts/subscribe")
 def api_subscribe(sub: SubscriberCreate):
     entry = {
         "school_name": sub.school_name,
@@ -288,6 +296,8 @@ def api_subscribe(sub: SubscriberCreate):
 
 @app.get("/alerts/subscribers")
 @app.get("/api/alerts/subscribers")
+@app.get("/api/index/alerts/subscribers")
+@app.get("/api/index.py/alerts/subscribers")
 def api_subscribers():
     return {
         "total_active": len(subscribers_db),
@@ -299,6 +309,10 @@ def api_subscribers():
 @app.get("/alerts/dispatch")
 @app.post("/api/alerts/dispatch")
 @app.get("/api/alerts/dispatch")
+@app.post("/api/index/alerts/dispatch")
+@app.get("/api/index/alerts/dispatch")
+@app.post("/api/index.py/alerts/dispatch")
+@app.get("/api/index.py/alerts/dispatch")
 def api_dispatch(force_test: bool = False):
     latest_pm25, feat_vec = get_recent_conditions()
     predicted_pm25 = predict_regression(feat_vec)
