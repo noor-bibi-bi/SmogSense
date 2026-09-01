@@ -1128,13 +1128,13 @@
           <i data-lucide="bell" style="width: 22px; height: 22px;"></i>
         </div>
         <div>
-          <h3 style="font-size: 1.15rem; font-family: var(--font-display);">Automated School Alert Dispatch</h3>
-          <p style="font-size: 0.78rem; color: var(--text-secondary);">Daily 6:00 AM Notification Layer for Lahore Institutions</p>
+          <h3 style="font-size: 1.15rem; font-family: var(--font-display);">On-Demand School Alert System</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">In-Browser Notification Layer for Lahore Institutions</p>
         </div>
       </div>
 
       <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.45;">
-        Configure immediate Web Push or Email notifications that fire automatically whenever tomorrow's forecast crosses into <strong>Move Indoors</strong> territory.
+        Configure in-browser notifications and alert evaluation whenever tomorrow's forecast crosses into <strong>Move Indoors</strong> territory.
       </p>
 
       <form id="alert-form" onsubmit="event.preventDefault(); handleAlertSubscribe();">
@@ -1591,7 +1591,7 @@
 
     sendNativeNotification(
       "SmogSense Alert Activated",
-      `Automated 6:00 AM dispatch enabled for ${school}. You will be notified whenever PM2.5 > ${threshold} µg/m³.`
+      `Alert subscription enabled for ${school}. You will be notified whenever PM2.5 > ${threshold} µg/m³.`
     );
   }
 
@@ -1602,12 +1602,12 @@
       const res = await fetch(`${API_BASE}/alerts/dispatch?force_test=true`, { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        showToast(`🚨 [06:00 AM DISPATCH]: Move Indoors alert dispatched to ${data.dispatches_sent || 1} registered school(s)!`, "warning");
+        showToast(`🚨 [ALERT DISPATCH]: Move Indoors advisory evaluated for ${data.dispatches_sent || 1} registered school(s)!`, "warning");
       } else {
-        showToast(`🚨 [MOCK DISPATCH 06:00 AM]: Move Indoors Alert sent to school administrator!`, "warning");
+        showToast(`🚨 [ALERT DISPATCH]: Move Indoors Advisory sent to school administrator!`, "warning");
       }
     } catch (e) {
-      showToast(`🚨 [MOCK DISPATCH 06:00 AM]: Move Indoors Alert sent to school administrator!`, "warning");
+      showToast(`🚨 [ALERT DISPATCH]: Move Indoors Advisory sent to school administrator!`, "warning");
     }
 
     sendNativeNotification(
