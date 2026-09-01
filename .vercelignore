@@ -1,18 +1,5 @@
-# Root .vercelignore for pure static Frontend deployment
-backend/
-api/
-*.py
-requirements.txt
-*.pkl
-*.json
+# SmogSense Global Ignore Rules
 *.csv
-pull_*.py
-train_*.py
-finalize_model.py
-enhanced_model.py
-check_stations.py
-get_sensors.py
-winter_validation.py
 Dockerfile
 Procfile
 render.yaml
