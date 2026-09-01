@@ -1,5 +1,6 @@
 """
 SmogSense FastAPI Backend for Vercel Python Serverless Runtime (@vercel/python).
+Ultra-lightweight Pure-Python Tree Inference (Zero XGBoost/Scikit-Learn/Joblib Runtime Dependencies).
 
 Endpoints:
   GET  /forecast          -> current PM2.5 + tomorrow's predicted PM2.5
@@ -10,9 +11,10 @@ Endpoints:
 """
 
 import os
+import json
+import math
 import requests
 import numpy as np
-import xgboost as xgb
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI
@@ -52,34 +54,75 @@ subscribers_db: List[Dict[str, Any]] = [
     }
 ]
 
-# Load trained XGBoost models using native Booster format
+# =========================================================================
+# Pure-Python Tree Inference Engine (Zero C++ / XGBoost Library Dependency)
+# =========================================================================
+
 reg_model_path = os.path.join(BASE_DIR, "reg_model.json")
 clf_model_path = os.path.join(BASE_DIR, "clf_model.json")
 
-reg_booster = xgb.Booster()
-if os.path.exists(reg_model_path):
-    reg_booster.load_model(reg_model_path)
-else:
-    # Fallback to root or pkl if needed
-    fallback_reg = os.path.join(BASE_DIR, "smogsense_regression_model.pkl")
-    if os.path.exists(fallback_reg):
-        import joblib
-        reg_booster = joblib.load(fallback_reg).get_booster()
+with open(reg_model_path, "r", encoding="utf-8") as f:
+    reg_json = json.load(f)
 
-clf_booster = xgb.Booster()
-if os.path.exists(clf_model_path):
-    clf_booster.load_model(clf_model_path)
-else:
-    fallback_clf = os.path.join(BASE_DIR, "smogsense_decision_model.pkl")
-    if os.path.exists(fallback_clf):
-        import joblib
-        clf_booster = joblib.load(fallback_clf).get_booster()
+with open(clf_model_path, "r", encoding="utf-8") as f:
+    clf_json = json.load(f)
 
+# Extract base scores and tree structures
+reg_base_score = float(reg_json["learner"]["learner_model_param"]["base_score"].strip("[]"))
+clf_base_prob = float(clf_json["learner"]["learner_model_param"]["base_score"].strip("[]"))
+clf_base_margin = math.log(clf_base_prob / (1.0 - clf_base_prob))
+
+reg_trees = reg_json["learner"]["gradient_booster"]["model"]["trees"]
+clf_trees = clf_json["learner"]["gradient_booster"]["model"]["trees"]
+
+
+def _traverse_tree(tree: Dict[str, Any], feat_vec: List[float]) -> float:
+    """Traverse a single XGBoost decision tree in pure Python."""
+    node = 0
+    lefts = tree["left_children"]
+    rights = tree["right_children"]
+    splits = tree["split_indices"]
+    conds = tree["split_conditions"]
+    default_left = tree["default_left"]
+
+    while lefts[node] != -1:
+        feat_idx = splits[node]
+        val = feat_vec[feat_idx]
+        if val is None or math.isnan(val):
+            node = lefts[node] if default_left[node] == 1 else rights[node]
+        elif val < conds[node]:
+            node = lefts[node]
+        else:
+            node = rights[node]
+
+    return conds[node]
+
+
+def predict_regression(feat_vec: List[float]) -> float:
+    """Evaluate all 200 regression booster trees."""
+    score = reg_base_score
+    for tree in reg_trees:
+        score += _traverse_tree(tree, feat_vec)
+    return score
+
+
+def predict_classification(feat_vec: List[float]) -> int:
+    """Evaluate all 200 classification booster trees with logistic sigmoid."""
+    margin = clf_base_margin
+    for tree in clf_trees:
+        margin += _traverse_tree(tree, feat_vec)
+    prob = 1.0 / (1.0 + math.exp(-margin))
+    return 1 if prob > 0.5 else 0
+
+
+# =========================================================================
+# FastAPI Application
+# =========================================================================
 
 app = FastAPI(
     title="SmogSense API",
-    description="Smart City Lahore Air Quality Forecasting & School Activity Advisory Backend",
-    version="2.0.0"
+    description="Smart City Lahore Air Quality Forecasting & School Activity Advisory Backend (Pure Python Inference)",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -181,30 +224,28 @@ def get_recent_conditions():
     precip_list = weather_json.get("precipitation_sum", [0.0])
 
     features_dict = {
-        "pm25": latest_pm25,
-        "pm25_lag1": lag1,
-        "pm25_lag3_avg": lag3_avg,
-        "pm25_lag7_avg": lag7_avg,
-        "pm25_change_1d": change_1d,
-        "pm25_volatility_7d": volatility_7d,
-        "temperature_c": temp_list[-1] if temp_list else 28.0,
-        "humidity_pct": hum_list[-1] if hum_list else 55.0,
-        "wind_speed_kmh": wind_list[-1] if wind_list else 8.0,
-        "precipitation_mm": precip_list[-1] if precip_list else 0.0,
-        "month": tomorrow.month,
-        "day_of_year": tomorrow.timetuple().tm_yday,
+        "pm25": float(latest_pm25),
+        "pm25_lag1": float(lag1),
+        "pm25_lag3_avg": float(lag3_avg),
+        "pm25_lag7_avg": float(lag7_avg),
+        "pm25_change_1d": float(change_1d),
+        "pm25_volatility_7d": float(volatility_7d),
+        "temperature_c": float(temp_list[-1]) if temp_list else 28.0,
+        "humidity_pct": float(hum_list[-1]) if hum_list else 55.0,
+        "wind_speed_kmh": float(wind_list[-1]) if wind_list else 8.0,
+        "precipitation_mm": float(precip_list[-1]) if precip_list else 0.0,
+        "month": int(tomorrow.month),
+        "day_of_year": int(tomorrow.timetuple().tm_yday),
         "is_smog_season": 1 if tomorrow.month in [11, 12, 1, 2] else 0,
     }
 
-    feature_array = np.array([[features_dict[col] for col in FEATURE_COLS]], dtype=np.float32)
-    dmatrix = xgb.DMatrix(feature_array, feature_names=FEATURE_COLS)
-
-    return latest_pm25, dmatrix
+    feat_vec = [features_dict[col] for col in FEATURE_COLS]
+    return latest_pm25, feat_vec
 
 
 def calculate_forecast():
-    latest_pm25, dmatrix = get_recent_conditions()
-    pred_val = float(reg_booster.predict(dmatrix)[0])
+    latest_pm25, feat_vec = get_recent_conditions()
+    pred_val = predict_regression(feat_vec)
     return {
         "current_pm25": round(float(latest_pm25), 1),
         "predicted_pm25_tomorrow": round(pred_val, 1),
@@ -212,9 +253,8 @@ def calculate_forecast():
 
 
 def calculate_recommendation():
-    _, dmatrix = get_recent_conditions()
-    raw_prob = float(clf_booster.predict(dmatrix)[0])
-    decision_code = 1 if raw_prob > 0.5 else 0
+    _, feat_vec = get_recent_conditions()
+    decision_code = predict_classification(feat_vec)
     decision = LABEL_MAP[decision_code]
     return {
         "decision": decision,
@@ -223,10 +263,9 @@ def calculate_recommendation():
 
 
 def execute_alert_dispatch(force_test: bool = False):
-    latest_pm25, dmatrix = get_recent_conditions()
-    predicted_pm25 = float(reg_booster.predict(dmatrix)[0])
-    raw_prob = float(clf_booster.predict(dmatrix)[0])
-    decision_code = 1 if raw_prob > 0.5 else 0
+    latest_pm25, feat_vec = get_recent_conditions()
+    predicted_pm25 = predict_regression(feat_vec)
+    decision_code = predict_classification(feat_vec)
     decision = LABEL_MAP[decision_code]
 
     is_alert_triggered = predicted_pm25 > DECISION_THRESHOLD or force_test
@@ -263,7 +302,7 @@ def root():
     return {
         "name": "SmogSense City Intelligence API",
         "status": "online",
-        "runtime": "Vercel Python Serverless",
+        "runtime": "Vercel Python Serverless (Pure-Python Tree Inference)",
         "endpoints": ["/forecast", "/recommendation", "/alerts/subscribe", "/alerts/dispatch"]
     }
 
