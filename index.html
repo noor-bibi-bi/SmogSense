@@ -1188,10 +1188,10 @@
 
 <script>
   // Configuration: Backend API Base URL
-  // Deployed on Vercel Python Serverless Runtime
+  // Deployed on Vercel Python Serverless Runtime under /api
   const API_BASE = (window.location.protocol.startsWith("http")) 
-    ? "" 
-    : "https://smog-sense.vercel.app";
+    ? "/api" 
+    : "https://smog-sense.vercel.app/api";
 
 
   let trendChart = null;

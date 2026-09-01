@@ -293,34 +293,34 @@ def execute_alert_dispatch(force_test: bool = False):
 
 
 # ==========================================
-# Routes (supports both /path and /api/path)
+# Routes (supports /api/* and top-level paths)
 # ==========================================
 
-@app.get("/")
 @app.get("/api")
+@app.get("/api/health")
 def root():
     return {
         "name": "SmogSense City Intelligence API",
         "status": "online",
         "runtime": "Vercel Python Serverless (Pure-Python Tree Inference)",
-        "endpoints": ["/forecast", "/recommendation", "/alerts/subscribe", "/alerts/dispatch"]
+        "endpoints": ["/api/forecast", "/api/recommendation", "/api/alerts/subscribe", "/api/alerts/dispatch"]
     }
 
 
-@app.get("/forecast")
 @app.get("/api/forecast")
+@app.get("/forecast")
 def api_forecast():
     return calculate_forecast()
 
 
-@app.get("/recommendation")
 @app.get("/api/recommendation")
+@app.get("/recommendation")
 def api_recommendation():
     return calculate_recommendation()
 
 
-@app.post("/alerts/subscribe")
 @app.post("/api/alerts/subscribe")
+@app.post("/alerts/subscribe")
 def api_subscribe(sub: SubscriberCreate):
     entry = {
         "school_name": sub.school_name,
@@ -336,8 +336,8 @@ def api_subscribe(sub: SubscriberCreate):
     }
 
 
-@app.get("/alerts/subscribers")
 @app.get("/api/alerts/subscribers")
+@app.get("/alerts/subscribers")
 def api_subscribers():
     return {
         "total_active": len(subscribers_db),
@@ -345,9 +345,9 @@ def api_subscribers():
     }
 
 
-@app.post("/alerts/dispatch")
-@app.get("/alerts/dispatch")
 @app.post("/api/alerts/dispatch")
 @app.get("/api/alerts/dispatch")
+@app.post("/alerts/dispatch")
+@app.get("/alerts/dispatch")
 def api_dispatch(force_test: bool = False):
     return execute_alert_dispatch(force_test=force_test)
