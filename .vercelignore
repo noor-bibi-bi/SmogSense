@@ -1,8 +1,17 @@
-# Ignore backend Python files and ML models so Vercel only deploys the static frontend
-*.py
-requirements.txt
-*.pkl
+# SmogSense Vercel Ignore Rules
+# Ignore training scripts, datasets, and local artifacts to keep bundle lean
 *.csv
+pull_*.py
+train_*.py
+finalize_model.py
+enhanced_model.py
+check_stations.py
+get_sensors.py
+winter_validation.py
+Dockerfile
 Procfile
 render.yaml
 __pycache__/
+*.log
+.git/
+.agents/

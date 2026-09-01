@@ -1188,8 +1188,10 @@
 
 <script>
   // Configuration: Backend API Base URL
-  // Deployed on Hugging Face Spaces
-  const API_BASE = "https://nooreee-smogsense-api.hf.space";
+  // Deployed on Vercel Python Serverless Runtime
+  const API_BASE = (window.location.protocol.startsWith("http")) 
+    ? "" 
+    : "https://smog-sense.vercel.app";
 
 
   let trendChart = null;
