@@ -1,5 +1,6 @@
 # SmogSense Vercel Ignore Rules
-# Ignore training scripts, datasets, and local artifacts to keep bundle lean
+# Ignore legacy HF Spaces app.py and training scripts so Vercel only compiles api/
+app.py
 *.csv
 pull_*.py
 train_*.py
